@@ -6,6 +6,30 @@
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_vector.h>
 
+typedef void (*log_callback)(const char*);
+log_callback logger = NULL;
+
+
+
+
+void output_matrix(const gsl_matrix* matrix)
+{
+	for (int i = 0; i < matrix->size1; i++)
+	{
+		for (int j = 0; j < matrix->size1; j++)
+		{
+			printf("%g\t", gsl_matrix_get(matrix, i, j));
+		}
+		printf("\n");
+	}
+}
+void output_vector(const gsl_vector* vector)
+{
+	for (int i = 0; i < vector->size; i++)
+	{
+		printf("%0.2lf\n", gsl_vector_get(vector, i));
+	}
+}
 
 enum RESULTS
 {
@@ -15,22 +39,21 @@ enum RESULTS
 	R_NONE,
 	R_INIT
 };
-
 enum FILLING
 {
-	F_RANDOM,
+	F_RANDOM = 1,
 	F_KEYBOARD,
 	F_EXIT,
 	F_DEFAULT
 };
-
 FILLING input_validator(const char* message = NULL)
 {
 	if (message != NULL)
 		printf(message);
 
 
-	static FILLING choice = F_DEFAULT;
+	static FILLING choice;
+	choice = F_DEFAULT;
 
 	while (choice != F_RANDOM && choice != F_KEYBOARD && choice != F_EXIT)
 	{
@@ -46,6 +69,7 @@ FILLING input_validator(const char* message = NULL)
 
 	return choice;
 }
+
 void generate_random_num_vector(gsl_vector* vector) 
 {
 	for (int i = 0; i < vector->size; i++) {
@@ -59,6 +83,7 @@ void generate_random_num_matrix(gsl_matrix* matrix) {
 		}
 	}
 }
+
 void input_matrix(gsl_matrix* matrix)
 {
 	for (int i = 0; i < matrix->size1; i++) 
@@ -79,24 +104,8 @@ void input_vector(gsl_vector* vector)
 		scanf_s("%lf", gsl_vector_ptr(vector, j)); 
 	}
 }
-void output_matrix(const gsl_matrix* matrix) 
-{
-	for (int i = 0; i < matrix->size1; i++) 
-	{
-		for (int j = 0; j < matrix->size1; j++) 
-		{
-			printf("%g\t", gsl_matrix_get(matrix, i, j));
-		}
-		printf("\n");
-	}
-}
-void output_vector(const gsl_vector* vector) 
-{
-	for (int i = 0; i < vector->size; i++) 
-	{
-		printf("%0.2lf\n", gsl_vector_get(vector, i));
-	}
-}
+
+
 void control_matrix_input(gsl_matrix* matrix, const char choice)
 {
 	switch (choice)
@@ -128,6 +137,7 @@ void control_vector_input(gsl_vector* vector, const char choice)
 	default: ;
 	}
 };
+
 gsl_vector* calculate_y1( gsl_matrix* matrix, const gsl_vector* vector, const int* matrix_dimension)
 {
 
@@ -151,7 +161,7 @@ gsl_vector* calculate_b(int* matrix_dimension)
 
 	return v;
 }
-gsl_vector* calculate_y2(int* matrix_dimension, const gsl_vector* b1, const gsl_vector* c1, const gsl_matrix* A1)
+gsl_vector* calculate_12b1_minus_c1(int* matrix_dimension, const gsl_vector* b1, const gsl_vector* c1)
 {
 	gsl_vector* result = gsl_vector_alloc(*matrix_dimension); // where n is the size of the vectors
 
@@ -165,6 +175,16 @@ gsl_vector* calculate_y2(int* matrix_dimension, const gsl_vector* b1, const gsl_
 
 	return result;
 }
+gsl_vector* calculate_y2(int* matrix_dimension, gsl_matrix* matrix, const gsl_vector* vector)
+{
+	gsl_vector* result = gsl_vector_alloc(*matrix_dimension);
+	double alpha = 1.0;
+	double beta = 0.0;
+	gsl_blas_dgemv(CblasNoTrans, alpha, matrix, vector, beta, result);
+	return result;
+}
+
+
 
 int get_matrix_dimension()
 {
@@ -180,7 +200,6 @@ int get_matrix_dimension()
 	return matrix_dimension;
 
 }
-
 RESULTS get_intermediate_result()
 {
 	RESULTS print_intermediate_result = R_INIT;
@@ -224,29 +243,44 @@ int main() {
 	gsl_matrix* C2 = NULL;
 	gsl_matrix* Y3 = NULL;
 
-	printf("**********************************");
+	/********INPUT VALUES*********/
+	printf("\n**********************************");
 	control_matrix_input(A, input_validator("\nEnter the values of the matrix A:\n"));
-	printf("**********************************");
+	printf("\n**********************************");
 
+	control_matrix_input(A1, input_validator("\nEnter the values of the matrix A1:\n"));
+	printf("\n**********************************");
+
+	control_vector_input(b1, input_validator("\nEnter column-vector b1:\n"));
+	printf("\n**********************************");
+
+	control_vector_input(c1, input_validator("\nEnter column-vector c1:\n"));
+	printf("\n**********************************");
+
+	control_matrix_input(A2, input_validator("\nEnter the values of the matrix A2:\n"));
+	printf("\n**********************************");
+
+	control_matrix_input(B2, input_validator("\nEnter the values of the matrix B2:\n"));
+	printf("\n**********************************");
+
+	/********CALCULATE VALUES FOR MAIN FORMULA*********/
 	printf("Formula b: bi = i^2 / 12 for even and bi = i for odd\n");
 	printf("Vector b:\n");
 	output_vector(b);
-	printf("**********************************");
+	printf("\n**********************************");
 
 	y1 = calculate_y1(A, b, &matrix_dimension);
 	printf("Formula y1 = A * b\n y1:\n");
 	output_vector(y1);
-	printf("**********************************");
+	printf("\n**********************************");
 
-	control_matrix_input(A1, input_validator("\nEnter the values of the matrix A1:\n"));
-	printf("**********************************");
 
-	control_vector_input(b1, input_validator("\nEnter column-vector b1:\n"));
-	printf("**********************************");
+	/********CALCULATE MAIN FORMULA STEP BY STEP*********/
 
-	control_vector_input(c1, input_validator("\nEnter column-vector c1:\n"));
-	printf("**********************************");
 
+
+
+	/*Free memory*/
 
 
 	return 0;
