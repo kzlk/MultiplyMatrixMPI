@@ -133,9 +133,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Lab2_Kozliuk_PRO.cpp" />
+    <ClCompile Include="Timer.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Task.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Logger.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

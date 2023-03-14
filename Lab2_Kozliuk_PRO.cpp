@@ -6,31 +6,16 @@
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_vector.h>
 
+#include "Timer.h"
+
 typedef void (*log_callback)(const char*);
 log_callback logger = NULL;
 
-
-
-
-void output_matrix(const gsl_matrix* matrix)
+enum VECTOR_TYPE
 {
-	for (int i = 0; i < matrix->size1; i++)
-	{
-		for (int j = 0; j < matrix->size1; j++)
-		{
-			printf("%g\t", gsl_matrix_get(matrix, i, j));
-		}
-		printf("\n");
-	}
-}
-void output_vector(const gsl_vector* vector)
-{
-	for (int i = 0; i < vector->size; i++)
-	{
-		printf("%0.2lf\n", gsl_vector_get(vector, i));
-	}
-}
-
+	V_ROW,
+	V_COL
+};
 enum RESULTS
 {
 	R_FILE = 1,
@@ -46,6 +31,28 @@ enum FILLING
 	F_EXIT,
 	F_DEFAULT
 };
+void output_matrix(const gsl_matrix* matrix)
+{
+	for (int i = 0; i < matrix->size1; i++)
+	{
+		for (int j = 0; j < matrix->size1; j++)
+		{
+			printf("%0.2lf\t", gsl_matrix_get(matrix, i, j));
+		}
+		printf("\n");
+	}
+}
+void output_vector(const gsl_vector* vector, const VECTOR_TYPE type = V_COL)
+{
+		for (int i = 0; i < vector->size; i++)
+		{
+			if(type == V_COL)
+				printf("%0.2lf\n", gsl_vector_get(vector, i));
+			else
+				printf("%0.2lf\t", gsl_vector_get(vector, i));
+		}
+}
+
 FILLING input_validator(const char* message = NULL)
 {
 	if (message != NULL)
@@ -138,10 +145,9 @@ void control_vector_input(gsl_vector* vector, const char choice)
 	}
 };
 
-gsl_vector* calculate_y1( gsl_matrix* matrix, const gsl_vector* vector, const int* matrix_dimension)
+gsl_vector* mult_matrix_by_vector( gsl_matrix* matrix, const gsl_vector* vector)
 {
-
-	gsl_vector* result = gsl_vector_alloc(*matrix_dimension);
+	gsl_vector* result = gsl_vector_alloc(matrix->size1);
 	double alpha = 1.0;
 	double beta = 0.0;
 	gsl_blas_dgemv(CblasNoTrans, alpha, matrix, vector, beta, result);
@@ -161,9 +167,9 @@ gsl_vector* calculate_b(int* matrix_dimension)
 
 	return v;
 }
-gsl_vector* calculate_12b1_minus_c1(int* matrix_dimension, const gsl_vector* b1, const gsl_vector* c1)
+gsl_vector* calculate_12b1_minus_c1(const gsl_vector* b1, const gsl_vector* c1)
 {
-	gsl_vector* result = gsl_vector_alloc(*matrix_dimension); // where n is the size of the vectors
+	gsl_vector* result = gsl_vector_alloc(b1->size); // where n is the size of the vectors
 
 	double alpha = 12.0; // coefficient for b1
 
@@ -175,13 +181,40 @@ gsl_vector* calculate_12b1_minus_c1(int* matrix_dimension, const gsl_vector* b1,
 
 	return result;
 }
-gsl_vector* calculate_y2(int* matrix_dimension, gsl_matrix* matrix, const gsl_vector* vector)
+gsl_vector* calculate_y2( gsl_matrix* matrix, const gsl_vector* vector)
 {
-	gsl_vector* result = gsl_vector_alloc(*matrix_dimension);
+	gsl_vector* result = gsl_vector_alloc(matrix->size1);
 	double alpha = 1.0;
 	double beta = 0.0;
 	gsl_blas_dgemv(CblasNoTrans, alpha, matrix, vector, beta, result);
 	return result;
+}
+gsl_matrix* calculate_C2(const int* matrix_dimension)
+{
+	gsl_matrix* matrix = gsl_matrix_alloc(*matrix_dimension, *matrix_dimension);
+	double temp = NULL;
+	for (int i = 0; i < *matrix_dimension; i++)
+	{
+		for(int j = 0; j < *matrix_dimension; j++)
+		{
+			temp = 1 / (i + 1 + pow((j + 1),2));
+			gsl_matrix_set(matrix, i, j, temp);
+		}
+	}
+	return matrix;
+}
+gsl_matrix* calculate_Y3(gsl_matrix* A2, gsl_matrix* B2, gsl_matrix* C2)
+{
+	gsl_matrix* Y3 = gsl_matrix_alloc(A2->size1, A2->size1);
+
+	gsl_matrix_memcpy(Y3, B2); // Y3 <- B2
+
+	gsl_matrix_sub(Y3, C2); // Y3 = Y3 - C2 
+
+	gsl_matrix_mul_elements(Y3, A2); // Y3 = Y3 * B2
+
+	return Y3;
+
 }
 
 
@@ -225,12 +258,24 @@ RESULTS get_intermediate_result()
 	return print_intermediate_result;
 }
 
+gsl_vector* main_calculation()
+{
+
+
+	return NULL;
+}
+
+
 int main() {
+	
 	int matrix_dimension = get_matrix_dimension();
 	RESULTS print_intermediate_result = get_intermediate_result();
 
+	//function = NULL
+	//switch result
+
 	gsl_matrix* A = gsl_matrix_alloc(matrix_dimension, matrix_dimension); 
-	gsl_vector* b = calculate_b(&matrix_dimension);					 
+	gsl_vector* b = NULL;					 
 	gsl_vector* y1 = NULL;
 
 	gsl_matrix* A1 = gsl_matrix_alloc(matrix_dimension, matrix_dimension);
@@ -264,21 +309,50 @@ int main() {
 	printf("\n**********************************");
 
 	/********CALCULATE VALUES FOR MAIN FORMULA*********/
-	printf("Formula b: bi = i^2 / 12 for even and bi = i for odd\n");
+	printf("\nCalculated values for main formula\n");
+
+	//calculate b1
+	printf("\nFormula b: bi = i^2 / 12 for even and bi = i for odd\n");
 	printf("Vector b:\n");
+	b = calculate_b(&matrix_dimension);
 	output_vector(b);
 	printf("\n**********************************");
 
-	y1 = calculate_y1(A, b, &matrix_dimension);
-	printf("Formula y1 = A * b\n y1:\n");
+	//calculate y1
+	y1 = mult_matrix_by_vector(A, b);
+	printf("\nFormula y1 = A * b\n y1:\n");
 	output_vector(y1);
+	printf("\n**********************************");
+
+	//for intermediate results
+	gsl_vector* b12_min_c1 = calculate_12b1_minus_c1(b1, c1);
+
+	//calculate y2
+	y2 = mult_matrix_by_vector(A1, b12_min_c1);
+	printf("\nFormula y2 = A1 * (12b1 - c1)\n y2=:\n");
+	output_vector(y2);
+	printf("\n**********************************");
+
+	//calculate C2; Cij = 1 / (i+j^2)
+	printf("\nFormula Cij = 1 / (1+j^2)\n C2=:\n");
+	C2 = calculate_C2(&matrix_dimension);
+	output_matrix(C2);
+	printf("\n**********************************");
+
+	//calculate Y3 = A2 * (B2 - C2)
+	printf("\nFormula Y3 = A2 * (B2 - C2)\n Y2=:\n");
+	Y3 = calculate_Y3(A2, B2, C2);
+	output_matrix(Y3);
 	printf("\n**********************************");
 
 
 	/********CALCULATE MAIN FORMULA STEP BY STEP*********/
 
+	//gsl_blas_dger
 
+		
 
+		
 
 	/*Free memory*/
 

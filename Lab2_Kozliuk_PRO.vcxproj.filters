@@ -18,8 +18,16 @@
     <ClCompile Include="Lab2_Kozliuk_PRO.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Timer.h">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Text Include="Task.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Logger.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
