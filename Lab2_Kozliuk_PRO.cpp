@@ -5,19 +5,14 @@
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_vector.h>
-
-#define MAX_FILENAME_LENGTH 256
-//#include "Logger.h"
 #include <cstring>
-
 #include "Logger.h"
 #include "Timer.h"
 
-enum VECTOR_TYPE
-{
-	V_ROW,
-	V_COL
-};
+#define MAX_FILENAME_LENGTH 256
+#define DEFAULT_OUTPUT_FILENAME "output.txt"
+
+
 
 enum FILLING
 {
@@ -32,7 +27,7 @@ void output_matrix(const gsl_matrix* matrix)
 	{
 		for (int j = 0; j < matrix->size1; j++)
 		{
-			printf("%0.2lf\t", gsl_matrix_get(matrix, i, j));
+			printf("%lf\t", gsl_matrix_get(matrix, i, j));
 		}
 		printf("\n");
 	}
@@ -42,9 +37,9 @@ void output_vector(const gsl_vector* vector, const VECTOR_TYPE type = V_COL)
 		for (int i = 0; i < vector->size; i++)
 		{
 			if(type == V_COL)
-				printf("%0.2lf\n", gsl_vector_get(vector, i));
+				printf("%lf\n", gsl_vector_get(vector, i));
 			else
-				printf("%0.2lf\t", gsl_vector_get(vector, i));
+				printf("%lf\t", gsl_vector_get(vector, i));
 		}
 }
 
@@ -295,7 +290,7 @@ char* get_input_file()
 
 }
 
-gsl_vector* main_calculation(const gsl_vector* y1, const gsl_vector* y2 , const gsl_matrix* Y3, logger* logger = NULL)
+gsl_vector* main_calculation(const gsl_vector* y1, const gsl_vector* y2 , const gsl_matrix* Y3, logger* my_logger = NULL)
 {
 	/********CALCULATE MAIN FORMULA STEP BY STEP*********/
 
@@ -334,6 +329,24 @@ gsl_vector* main_calculation(const gsl_vector* y1, const gsl_vector* y2 , const 
 	
 	gsl_vector* final_result = add_row_to_row_vector(y2, pre_final_result2);
 
+
+	if (my_logger != NULL)
+	{
+		log_vector(my_logger, y1, "y1'", V_ROW);
+		log_vector(my_logger, y2, "y2", V_ROW);
+
+		log_matrix(my_logger, y1_trans_mul_y1, "y1'*y1");
+		log_matrix(my_logger, y1_trans_mul_y2, "y1' * y2");
+		log_matrix(my_logger, y1_mul_y2_trans, "y1 * y2'");
+		log_matrix(my_logger, Y3_square, "Y3 * Y3");
+		log_matrix(my_logger, Y3_square_mul_y1_trans_mul_y1, "[Y3^2] * [y1' * y1]");
+		log_matrix(my_logger, Y3_sq_mul_y1_tr_mul_y1_pl_y1_tr_mul_y2, "[Y3^2 * y1' * y1] + [y1' * y2]");
+		log_matrix(my_logger, Y3_sq_mul_y1_tr_mul_y1_pl_y1_tr_mul_y2_mul_Y3, "([Y3^2 * y1' * y1] + [y1' * y2]) * Y3");
+		log_matrix(my_logger, pre_final_result1, "([Y3^2 * y1' * y1] + [y1' * y2]) * Y3 + [y1  * y2']");
+
+		log_vector(my_logger, pre_final_result2, "([([Y3^2 * y1' * y1] + [y1' * y2]) * Y3 + [y1  * y2']]) * y2");
+	}
+
 	gsl_matrix_free(y1_trans_mul_y1);
 	gsl_matrix_free(y1_trans_mul_y2);
 	gsl_matrix_free(y1_mul_y2_trans);
@@ -359,25 +372,19 @@ int main()
 	{
 		char* filename = get_input_file();
 		my_logger = create_logger(print_intermediate_result, filename);
-
-	}else
+	}
+	else
 	{
 		my_logger = create_logger(print_intermediate_result);
 	}
 
-	gsl_matrix* A = gsl_matrix_alloc(matrix_dimension, matrix_dimension); 
-	gsl_vector* b = NULL;					 
-	gsl_vector* y1 = NULL;
-
+	//Allocate matrix and vector
+	gsl_matrix* A = gsl_matrix_alloc(matrix_dimension, matrix_dimension);
 	gsl_matrix* A1 = gsl_matrix_alloc(matrix_dimension, matrix_dimension);
 	gsl_vector* b1 = gsl_vector_alloc(matrix_dimension);
 	gsl_vector* c1 = gsl_vector_alloc(matrix_dimension);
-	gsl_vector* y2 = NULL;
-
 	gsl_matrix* A2 = gsl_matrix_alloc(matrix_dimension, matrix_dimension);
 	gsl_matrix* B2 = gsl_matrix_alloc(matrix_dimension, matrix_dimension);
-	gsl_matrix* C2 = NULL;
-	gsl_matrix* Y3 = NULL;
 
 	/********INPUT VALUES*********/
 	printf("\n**********************************");
@@ -399,47 +406,40 @@ int main()
 	control_matrix_input(B2, input_validator("\nEnter the values of the matrix B2:\n"));
 	printf("\n**********************************");
 
+	logger* input_log = create_logger(R_FILE, DEFAULT_OUTPUT_FILENAME);
+
+	if (my_logger->file != NULL)
+		input_log->file = my_logger->file;
+
+	log_matrix(input_log, A, "input A:");
+	log_matrix(input_log, A1, "input A1:");
+	log_vector(input_log, b1, "input b1:");
+	log_vector(input_log, c1, "input c1:");
+	log_matrix(input_log, A2, "input A2:");
+	log_matrix(input_log, B2, "input B2:");
+
 	/********CALCULATE VALUES FOR MAIN FORMULA*********/
-	printf("\nCalculated values for main formula\n");
-
-	//calculate b1
-	printf("\nFormula b: bi = i^2 / 12 for even and bi = i for odd\n");
-	printf("Vector b:\n");
-	b = calculate_b(&matrix_dimension);
-	output_vector(b);
-	printf("\n**********************************");
-
-	//calculate y1
-	y1 = mult_matrix_by_vector(A, b);
-	printf("\nFormula y1 = A * b\n y1:\n");
-	output_vector(y1);
-	printf("\n**********************************");
-
-	//for intermediate results
+	gsl_vector* b = calculate_b(&matrix_dimension);
+	gsl_vector* y1 = mult_matrix_by_vector(A, b);
 	gsl_vector* b12_min_c1 = calculate_12b1_minus_c1(b1, c1);
-	
-	//calculate y2
-	y2 = mult_matrix_by_vector(A1, b12_min_c1);
-	printf("\nFormula y2 = A1 * (12b1 - c1)\n y2=:\n");
-	output_vector(y2);
-	printf("\n**********************************");
+	gsl_vector* y2 = mult_matrix_by_vector(A1, b12_min_c1);
+	gsl_matrix* C2 = calculate_C2(&matrix_dimension);
+	gsl_matrix* Y3 = calculate_Y3(A2, B2, C2);
 
-	//calculate C2; Cij = 1 / (i+j^2)
-	printf("\nFormula Cij = 1 / (1+j^2)\n C2=:\n");
-	C2 = calculate_C2(&matrix_dimension);
-	output_matrix(C2);
-	printf("\n**********************************");
+	if(my_logger!= NULL && (print_intermediate_result != R_NONE))
+	{
+		log_vector(my_logger, b, "b: bi = i^2 / 12 for even and bi = i for odd\n b:");
+		log_vector(my_logger, y1, "y1 = A * b\n y1:");
+		log_vector(my_logger, b12_min_c1, "b12 minus c1 =:");
+		log_vector(my_logger, y2, "y2 = A1 * (12b1 - c1)\n y2=:");
+		log_matrix(my_logger, C2, "Cij = 1 / (1+j^2)\n C2=:");
+		log_matrix(my_logger, Y3, "Y3 = A2 * (B2 - C2)\n Y3=:");
+	}
 
-	//calculate Y3 = A2 * (B2 - C2)
-	printf("\nFormula Y3 = A2 * (B2 - C2)\n Y3=:\n");
-	Y3 = calculate_Y3(A2, B2, C2);
-	output_matrix(Y3);
-	printf("\n**********************************");
+	//Main calculation
+	gsl_vector* result = main_calculation(y1, y2, Y3, my_logger);
 
-	gsl_vector* result  = main_calculation(y1, y2, Y3);
-
-	log_vector(my_logger, b12_min_c1, "B12 - C1 ");
-	log_matrix(my_logger, Y3, "Formula Y3 = A2 * (B2 - C2)\n Y3=");
+	log_vector(input_log, result, "result:", V_ROW);
 
 	/*Free memory*/
 	gsl_matrix_free(A);
@@ -448,13 +448,17 @@ int main()
 	gsl_matrix_free(B2);
 	gsl_matrix_free(C2);
 	gsl_matrix_free(Y3);
+
 	gsl_vector_free(b);
 	gsl_vector_free(y1);
-
+	gsl_vector_free(b12_min_c1);
 	gsl_vector_free(b1);
 	gsl_vector_free(c1);
 	gsl_vector_free(y2);
+	gsl_vector_free(result);
 
+	if (my_logger->file == NULL)
+		destroy_logger(input_log);
 	destroyTimer(my_timer);
 	destroy_logger(my_logger);
 

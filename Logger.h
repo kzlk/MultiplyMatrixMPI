@@ -5,6 +5,12 @@
 
 typedef void (*log_func)(const char*, FILE* file);
 
+enum VECTOR_TYPE
+{
+    V_ROW,
+    V_COL
+};
+
 enum RESULTS
 {
     R_FILE = 1,
@@ -28,4 +34,4 @@ void log_result(logger* log, const char* message);
 void destroy_logger(logger* log);
 
 void log_matrix(logger* log, const gsl_matrix* matrix, const char* name);
-void log_vector(logger* log, const gsl_vector* vector, const char* name);
+void log_vector(logger* log, const gsl_vector* vector, const char* name, const VECTOR_TYPE type = V_COL);
