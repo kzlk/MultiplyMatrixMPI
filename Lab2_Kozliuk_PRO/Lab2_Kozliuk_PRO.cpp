@@ -6,8 +6,12 @@
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_vector.h>
 #include <cstring>
-#include "Logger.h"
-#include "Timer.h"
+
+#include "../Tools/Timer/Timer.h"
+#include "../Tools/Logger/Logger.h"
+
+
+
 #define MAX_FILENAME_LENGTH 256
 #define DEFAULT_OUTPUT_FILENAME "output.txt"
 
@@ -442,7 +446,7 @@ int main()
 	gsl_matrix* Y3 = mult_matrix_by_matrix(A2, B2_min_C2);
 	//gsl_matrix_mul_elements(Y3, A2); // Y3 = B2_min_C2 * B2
 
-	if(my_logger!= NULL && (print_intermediate_result != R_NONE))
+	if(my_logger->func!= NULL && (print_intermediate_result != R_NONE))
 	{
 		log_vector(my_logger, b, "b: bi = i^2 / 12 for even and bi = i for odd\n b:");
 		log_vector(my_logger, y1, "y1 = A * b\n y1:");

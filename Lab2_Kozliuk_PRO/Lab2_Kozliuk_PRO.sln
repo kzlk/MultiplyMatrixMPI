@@ -5,6 +5,8 @@ VisualStudioVersion = 17.4.33213.308
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Lab2_Kozliuk_PRO", "Lab2_Kozliuk_PRO.vcxproj", "{F8EA2AA9-8FE8-4C14-8084-EAA883E968A6}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MPI_Kozliuk_Lab2", "..\MPI_Kozliuk_Lab2\MPI_Kozliuk_Lab2.vcxproj", "{3F66DC8A-8FB4-4A0D-BA86-66D8499CD800}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -21,6 +23,14 @@ Global
 		{F8EA2AA9-8FE8-4C14-8084-EAA883E968A6}.Release|x64.Build.0 = Release|x64
 		{F8EA2AA9-8FE8-4C14-8084-EAA883E968A6}.Release|x86.ActiveCfg = Release|Win32
 		{F8EA2AA9-8FE8-4C14-8084-EAA883E968A6}.Release|x86.Build.0 = Release|Win32
+		{3F66DC8A-8FB4-4A0D-BA86-66D8499CD800}.Debug|x64.ActiveCfg = Debug|x64
+		{3F66DC8A-8FB4-4A0D-BA86-66D8499CD800}.Debug|x64.Build.0 = Debug|x64
+		{3F66DC8A-8FB4-4A0D-BA86-66D8499CD800}.Debug|x86.ActiveCfg = Debug|Win32
+		{3F66DC8A-8FB4-4A0D-BA86-66D8499CD800}.Debug|x86.Build.0 = Debug|Win32
+		{3F66DC8A-8FB4-4A0D-BA86-66D8499CD800}.Release|x64.ActiveCfg = Release|x64
+		{3F66DC8A-8FB4-4A0D-BA86-66D8499CD800}.Release|x64.Build.0 = Release|x64
+		{3F66DC8A-8FB4-4A0D-BA86-66D8499CD800}.Release|x86.ActiveCfg = Release|Win32
+		{3F66DC8A-8FB4-4A0D-BA86-66D8499CD800}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
