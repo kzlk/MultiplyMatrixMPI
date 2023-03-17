@@ -66,38 +66,46 @@ void destroy_logger(logger* log)
 
 void log_matrix(logger* log, const gsl_matrix* matrix, const char* name)
 {
-    const size_t buf_size = 1000;
-    char* message = (char*)malloc(buf_size);
-    sprintf_s(message, buf_size, "\nMatrix %s:\n", name);
-    log_result(log, message);
-    for (size_t i = 0; i < matrix->size1; i++)
+    if (log->func != NULL)
     {
-        sprintf_s(message, buf_size, "  [ ");
-        for (size_t j = 0; j < matrix->size2; j++)
-        {
-            sprintf_s(message + strlen(message), buf_size - strlen(message), "%f ", gsl_matrix_get(matrix, i, j));
-        }
-        sprintf_s(message + strlen(message), buf_size - strlen(message), "]\n");
+        const size_t buf_size = 100000;
+        char* message = (char*)malloc(buf_size);
+        sprintf_s(message, buf_size, "\nMatrix %s:\n", name);
         log_result(log, message);
-    }
-  //  sprintf_s(message + strlen(message), buf_size - strlen(message),
-      //  "\n********************************************\n");
-    //log_result(log, message);
+        for (size_t i = 0; i < matrix->size1; i++)
+        {
+            sprintf_s(message, buf_size, "  [ ");
+            for (size_t j = 0; j < matrix->size2; j++)
+            {
+                sprintf_s(message + strlen(message), buf_size - strlen(message), "%f ", gsl_matrix_get(matrix, i, j));
+            }
+            sprintf_s(message + strlen(message), buf_size - strlen(message), "]\n");
+            log_result(log, message);
+        }
+        //  sprintf_s(message + strlen(message), buf_size - strlen(message),
+            //  "\n********************************************\n");
+          //log_result(log, message);
 
-    free(message);
+        free(message);
+    }
 }
 
 void log_vector(logger* log, const gsl_vector* vector, const char* name, const VECTOR_TYPE type)
 {
-    const size_t buf_size = 1000;
+    const size_t buf_size = 100000;
     char* message = (char*)malloc(buf_size);
-    sprintf_s(message, buf_size, "\nVector %s: \n[\n ", name);
+    sprintf_s(message, buf_size, "\nVector %s: \n[\n", name);
     for (size_t i = 0; i < vector->size; i++)
     {
         if(type == V_COL)
             sprintf_s(message + strlen(message), buf_size - strlen(message), "%f\n", gsl_vector_get(vector, i));
         else
-			sprintf_s(message + strlen(message), buf_size - strlen(message), "%f ", gsl_vector_get(vector, i));
+        {
+            sprintf_s(message + strlen(message), buf_size - strlen(message), "%f ", gsl_vector_get(vector, i));
+            if(i == vector->size-1)
+                sprintf_s(message + strlen(message), buf_size - strlen(message), "%f\n", gsl_vector_get(vector, i));
+        }
+			
     }
     sprintf_s(message + strlen(message), buf_size - strlen(message), "]\n");
   //  sprintf_s(message + strlen(message), buf_size - strlen(message), 

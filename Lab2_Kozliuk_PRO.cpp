@@ -8,11 +8,8 @@
 #include <cstring>
 #include "Logger.h"
 #include "Timer.h"
-
 #define MAX_FILENAME_LENGTH 256
 #define DEFAULT_OUTPUT_FILENAME "output.txt"
-
-
 
 enum FILLING
 {
@@ -70,13 +67,15 @@ FILLING input_validator(const char* message = NULL)
 void generate_random_num_vector(gsl_vector* vector) 
 {
 	for (int i = 0; i < vector->size; i++) {
-		gsl_vector_set(vector, i, rand() % 100 + 1);
+		//gsl_vector_set(vector, i, rand() % 100 + 1);
+		gsl_vector_set(vector, i, i+1);
 	}
 }
 void generate_random_num_matrix(gsl_matrix* matrix) {
 	for (int i = 0; i < matrix->size1; i++) {
 		for (int j = 0; j < matrix->size1; j++) {
-			gsl_matrix_set(matrix, i, j, rand() % 100 + 1);
+			//gsl_matrix_set(matrix, i, j, rand() % 100 + 1);
+			gsl_matrix_set(matrix, i, j, i+1 * j+1 * j+1);
 		}
 	}
 }
@@ -107,7 +106,7 @@ void control_matrix_input(gsl_matrix* matrix, const char choice)
 	{
 	case F_RANDOM:
 		generate_random_num_matrix(matrix);
-		output_matrix(matrix);
+		//output_matrix(matrix);
 		break;
 	case F_KEYBOARD:
 		input_matrix(matrix);
@@ -207,6 +206,7 @@ gsl_matrix* calculate_Y3(gsl_matrix* A2, gsl_matrix* B2, gsl_matrix* C2)
 gsl_matrix* mult_row_by_col_vector(const gsl_vector* row_vector, const gsl_vector* col_vector)
 {
 	gsl_matrix* result = gsl_matrix_alloc(row_vector->size, row_vector->size);
+	gsl_matrix_set_zero(result);
 	//1 - col vector, 2 - row vector
 	gsl_blas_dger(1.0, col_vector, row_vector, result);
 	return  result;
@@ -220,17 +220,24 @@ gsl_matrix* mult_matrix_by_matrix(const gsl_matrix* matrix1, const gsl_matrix* m
 gsl_matrix* add_matrix_to_matrix(const gsl_matrix* matrix1, const gsl_matrix* matrix2)
 {
 	gsl_matrix* result = gsl_matrix_alloc(matrix1->size1, matrix1->size1);
-	gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, matrix1, matrix2, 0, result);
+	gsl_matrix_memcpy(result, matrix2);
+	gsl_matrix_add(result, matrix1);
 	return  result;
 }
-gsl_vector* add_row_to_row_vector(const gsl_vector* vector1, const gsl_vector* vector2)
+gsl_vector* add_vector_to_vector(const gsl_vector* vector1, const gsl_vector* vector2)
 {
 	gsl_vector* result = gsl_vector_alloc(vector1->size);
 	gsl_vector_memcpy(result, vector1); // копіюємо значення вектора v1 в result
 	gsl_vector_add(result, vector2);	// додаємо до result вектор v2
 	return result;
 }
-
+gsl_matrix* mult_scalar_by_matrix(const double scalar, const gsl_matrix* matrix)
+{
+	gsl_matrix* result = gsl_matrix_alloc(matrix->size1, matrix->size1);
+	gsl_matrix_memcpy(result, matrix); 
+	gsl_matrix_scale(result, scalar);
+	return result;
+}
 int get_matrix_dimension()
 {
 	int matrix_dimension = 0;
@@ -294,68 +301,66 @@ gsl_vector* main_calculation(const gsl_vector* y1, const gsl_vector* y2 , const 
 {
 	/********CALCULATE MAIN FORMULA STEP BY STEP*********/
 
-	//y1'*y1
-	gsl_matrix* y1_trans_mul_y1 = mult_row_by_col_vector(y1, y1);
-
-	//y1' * y2
-	gsl_matrix* y1_trans_mul_y2 = mult_row_by_col_vector(y1, y2);
-
 	//y1 * y2'
 	gsl_matrix* y1_mul_y2_trans = mult_row_by_col_vector(y2, y1);
 
 	//Y3^2 -> Y3 * Y3
 	gsl_matrix* Y3_square = mult_matrix_by_matrix(Y3, Y3);
 
-	//[Y3^2] * [y1' * y1]
-	gsl_matrix* Y3_square_mul_y1_trans_mul_y1 = mult_matrix_by_matrix(Y3_square, y1_trans_mul_y1);
+	//Y3^2 * y1
+	gsl_vector* Y3_square_mul_y1 = mult_matrix_by_vector(Y3_square, y1);
 
-	//[Y3^2 * y1' * y1] + [y1' * y2]
-	gsl_matrix* Y3_sq_mul_y1_tr_mul_y1_pl_y1_tr_mul_y2 = add_matrix_to_matrix(
-		Y3_square_mul_y1_trans_mul_y1, y1_trans_mul_y2);
+	//[Y3^2 * y1] + y2
+	gsl_vector* Y3_square_mul_y1_add_y2 = add_vector_to_vector(Y3_square_mul_y1, y2);
 
-	//([Y3^2 * y1' * y1] + [y1' * y2]) * Y3
-	gsl_matrix* Y3_sq_mul_y1_tr_mul_y1_pl_y1_tr_mul_y2_mul_Y3 = mult_matrix_by_matrix(
-		Y3_sq_mul_y1_tr_mul_y1_pl_y1_tr_mul_y2, Y3);
+	//y1' * ([Y3^2 * y1] + y2)
+	double y1_trans_mul_Y3_square_mul_y1_add_y2 = NULL;
+	gsl_blas_ddot(y1, Y3_square_mul_y1_add_y2, &y1_trans_mul_Y3_square_mul_y1_add_y2);
 
-	//([Y3^2 * y1' * y1] + [y1' * y2]) * Y3 + [y1  * y2']
-	gsl_matrix* pre_final_result1 =
-		add_matrix_to_matrix(Y3_sq_mul_y1_tr_mul_y1_pl_y1_tr_mul_y2_mul_Y3, y1_mul_y2_trans);
+	//y1' * ([Y3^2 * y1] + y2) * Y3
+	gsl_matrix* y1_trans_mul_Y3_square_mul_y1_add_y2_mul_Y3 = mult_scalar_by_matrix(y1_trans_mul_Y3_square_mul_y1_add_y2, Y3);
 
-	//([([Y3^2 * y1' * y1] + [y1' * y2]) * Y3 + [y1  * y2']]) * y2
-	gsl_vector* pre_final_result2 = mult_matrix_by_vector(pre_final_result1, y2);
+	//(y1' * ([Y3^2 * y1] + y2) * Y3 + y1*y2')
+	gsl_matrix* pre_final_res1 = add_matrix_to_matrix(y1_trans_mul_Y3_square_mul_y1_add_y2_mul_Y3, y1_mul_y2_trans);
 
-	//[([([Y3^2 * y1' * y1] + [y1' * y2]) * Y3 + [y1  * y2']]) * y2]'
-	//[y2'] + [([([Y3^2 * y1' * y1] + [y1' * y2]) * Y3 + [y1  * y2']]) * y2]'
-	
-	gsl_vector* final_result = add_row_to_row_vector(y2, pre_final_result2);
+	//(y1' * ([Y3^2 * y1] + y2) * Y3 + y1*y2') * y2
+	gsl_vector* pre_final_res2 = mult_matrix_by_vector(pre_final_res1, y2);
+
+	//y2' + [(y1' * ([Y3^2 * y1] + y2) * Y3 + y1*y2') * y2]'
+	gsl_vector* final_result = add_vector_to_vector(y2, pre_final_res2);
 
 
-	if (my_logger != NULL)
+	if (my_logger->func != NULL)
 	{
-		log_vector(my_logger, y1, "y1'", V_ROW);
-		log_vector(my_logger, y2, "y2", V_ROW);
-
-		log_matrix(my_logger, y1_trans_mul_y1, "y1'*y1");
-		log_matrix(my_logger, y1_trans_mul_y2, "y1' * y2");
+		
+		log_vector(my_logger, y2, "y2'", V_ROW);
 		log_matrix(my_logger, y1_mul_y2_trans, "y1 * y2'");
-		log_matrix(my_logger, Y3_square, "Y3 * Y3");
-		log_matrix(my_logger, Y3_square_mul_y1_trans_mul_y1, "[Y3^2] * [y1' * y1]");
-		log_matrix(my_logger, Y3_sq_mul_y1_tr_mul_y1_pl_y1_tr_mul_y2, "[Y3^2 * y1' * y1] + [y1' * y2]");
-		log_matrix(my_logger, Y3_sq_mul_y1_tr_mul_y1_pl_y1_tr_mul_y2_mul_Y3, "([Y3^2 * y1' * y1] + [y1' * y2]) * Y3");
-		log_matrix(my_logger, pre_final_result1, "([Y3^2 * y1' * y1] + [y1' * y2]) * Y3 + [y1  * y2']");
 
-		log_vector(my_logger, pre_final_result2, "([([Y3^2 * y1' * y1] + [y1' * y2]) * Y3 + [y1  * y2']]) * y2");
+		log_matrix(my_logger, Y3_square, "Y3^2");
+
+		log_vector(my_logger, Y3_square_mul_y1, "Y3^2 * y1");
+
+		log_vector(my_logger, Y3_square_mul_y1_add_y2, "[Y3^2 * y1] + y2");
+
+		char buf[100];
+		sprintf_s(buf, 100, "\nNumber y1' * ([Y3^2 * y1] + y2): %lf \n", y1_trans_mul_Y3_square_mul_y1_add_y2);
+		log_result(my_logger, buf);
+
+		log_matrix(my_logger, y1_trans_mul_Y3_square_mul_y1_add_y2_mul_Y3, "y1' * ([Y3^2 * y1] + y2) * Y3");
+		log_matrix(my_logger, pre_final_res1, "(y1' * ([Y3^2 * y1] + y2) * Y3 + y1*y2')");
+
+		log_vector(my_logger, pre_final_res2, "(y1' * ([Y3^2 * y1] + y2) * Y3 + y1*y2') * y2");
+
+		log_vector(my_logger, pre_final_res2, "((y1' * ([Y3^2 * y1] + y2) * Y3 + y1*y2') * y2)'", V_ROW);
 	}
 
-	gsl_matrix_free(y1_trans_mul_y1);
-	gsl_matrix_free(y1_trans_mul_y2);
 	gsl_matrix_free(y1_mul_y2_trans);
 	gsl_matrix_free(Y3_square);
-	gsl_matrix_free(Y3_square_mul_y1_trans_mul_y1);
-	gsl_matrix_free(Y3_sq_mul_y1_tr_mul_y1_pl_y1_tr_mul_y2);
-	gsl_matrix_free(Y3_sq_mul_y1_tr_mul_y1_pl_y1_tr_mul_y2_mul_Y3);
-	gsl_matrix_free(pre_final_result1);
-	gsl_vector_free(pre_final_result2);
+	gsl_vector_free(Y3_square_mul_y1);
+	gsl_vector_free(Y3_square_mul_y1_add_y2);
+	gsl_matrix_free(y1_trans_mul_Y3_square_mul_y1_add_y2_mul_Y3);
+	gsl_matrix_free(pre_final_res1);
+	gsl_vector_free(pre_final_res2);
 
 	return final_result;
 }
@@ -418,13 +423,24 @@ int main()
 	log_matrix(input_log, A2, "input A2:");
 	log_matrix(input_log, B2, "input B2:");
 
+	startTimer(my_timer);
 	/********CALCULATE VALUES FOR MAIN FORMULA*********/
 	gsl_vector* b = calculate_b(&matrix_dimension);
 	gsl_vector* y1 = mult_matrix_by_vector(A, b);
 	gsl_vector* b12_min_c1 = calculate_12b1_minus_c1(b1, c1);
 	gsl_vector* y2 = mult_matrix_by_vector(A1, b12_min_c1);
 	gsl_matrix* C2 = calculate_C2(&matrix_dimension);
-	gsl_matrix* Y3 = calculate_Y3(A2, B2, C2);
+	//gsl_matrix* Y3 = calculate_Y3(A2, B2, C2);
+
+	gsl_matrix* B2_min_C2= gsl_matrix_alloc(A2->size1, A2->size1);
+	 //= gsl_matrix_alloc(A2->size1, A2->size1);
+
+	gsl_matrix_memcpy(B2_min_C2, B2); // B2_min_C2 <- B2
+
+	gsl_matrix_sub(B2_min_C2, C2); // B2_min_C2 = B2_min_C2 - C2 
+
+	gsl_matrix* Y3 = mult_matrix_by_matrix(A2, B2_min_C2);
+	//gsl_matrix_mul_elements(Y3, A2); // Y3 = B2_min_C2 * B2
 
 	if(my_logger!= NULL && (print_intermediate_result != R_NONE))
 	{
@@ -432,15 +448,24 @@ int main()
 		log_vector(my_logger, y1, "y1 = A * b\n y1:");
 		log_vector(my_logger, b12_min_c1, "b12 minus c1 =:");
 		log_vector(my_logger, y2, "y2 = A1 * (12b1 - c1)\n y2=:");
-		log_matrix(my_logger, C2, "Cij = 1 / (1+j^2)\n C2=:");
+		log_matrix(my_logger, C2, "Cij = 1 / (i+j^2)\n C2=:");
+		log_matrix(my_logger, B2_min_C2, "B2 - C2 =:");
 		log_matrix(my_logger, Y3, "Y3 = A2 * (B2 - C2)\n Y3=:");
 	}
 
 	//Main calculation
+
 	gsl_vector* result = main_calculation(y1, y2, Y3, my_logger);
+	
+	stopTimer(my_timer);
+	printf("\n Calculation time is %lf s", getElapsedSeconds(my_timer));
+	
+	log_vector(input_log, result, "result y2' + [(y1' * ([Y3^2 * y1] + y2) * Y3 + y1*y2') * y2]':", V_ROW);
 
-	log_vector(input_log, result, "result:", V_ROW);
-
+	printf("\nresult y2' + [(y1' * ([Y3^2 * y1] + y2) * Y3 + y1*y2') * y2]': \n[\n");
+	output_vector(result, V_ROW);
+	printf("\n]");
+	
 	/*Free memory*/
 	gsl_matrix_free(A);
 	gsl_matrix_free(A1);
@@ -456,7 +481,6 @@ int main()
 	gsl_vector_free(c1);
 	gsl_vector_free(y2);
 	gsl_vector_free(result);
-
 	if (my_logger->file == NULL)
 		destroy_logger(input_log);
 	destroyTimer(my_timer);
