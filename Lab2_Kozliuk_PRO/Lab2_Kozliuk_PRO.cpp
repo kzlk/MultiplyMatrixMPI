@@ -10,8 +10,6 @@
 #include "../Tools/Timer/Timer.h"
 #include "../Tools/Logger/Logger.h"
 
-
-
 #define MAX_FILENAME_LENGTH 256
 #define DEFAULT_OUTPUT_FILENAME "output.txt"
 

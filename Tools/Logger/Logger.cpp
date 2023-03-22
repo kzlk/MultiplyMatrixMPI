@@ -27,7 +27,7 @@ logger* create_logger(RESULTS log_type, const char* filename)
     {
     case R_FILE:
         log->func = log_to_file;
-        fopen_s(&log->file, filename, "a");
+        fopen_s(&log->file, filename, "w+");
         break;
     case R_CONSOLE:
         log->func = log_to_console;
@@ -35,7 +35,7 @@ logger* create_logger(RESULTS log_type, const char* filename)
         break;
     case R_BOTH:
         log->func = log_to_both;
-        fopen_s(&log->file, filename, "a");
+        fopen_s(&log->file, filename, "w+");
         break;
     default:
         log->func = NULL;
@@ -101,9 +101,10 @@ void log_vector(logger* log, const gsl_vector* vector, const char* name, const V
             sprintf_s(message + strlen(message), buf_size - strlen(message), "%f\n", gsl_vector_get(vector, i));
         else
         {
-            sprintf_s(message + strlen(message), buf_size - strlen(message), "%f ", gsl_vector_get(vector, i));
-            if(i == vector->size-1)
+            if (i == vector->size - 1)
                 sprintf_s(message + strlen(message), buf_size - strlen(message), "%f\n", gsl_vector_get(vector, i));
+            else sprintf_s(message + strlen(message), buf_size - strlen(message), "%f ", gsl_vector_get(vector, i));
+           
         }
 			
     }

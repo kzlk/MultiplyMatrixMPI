@@ -1,0 +1,1 @@
+start "E:\Developer_Project\C++\PRO\Lab2_Kozliuk\Lab2_Kozliuk_PRO\x64\Debug\MPI_Kozliuk_Lab2.exe"
