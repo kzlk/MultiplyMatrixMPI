@@ -82,10 +82,6 @@ void log_matrix(logger* log, const gsl_matrix* matrix, const char* name)
             sprintf_s(message + strlen(message), buf_size - strlen(message), "]\n");
             log_result(log, message);
         }
-        //  sprintf_s(message + strlen(message), buf_size - strlen(message),
-            //  "\n********************************************\n");
-          //log_result(log, message);
-
         free(message);
     }
 }
@@ -109,8 +105,6 @@ void log_vector(logger* log, const gsl_vector* vector, const char* name, const V
 			
     }
     sprintf_s(message + strlen(message), buf_size - strlen(message), "]\n");
-  //  sprintf_s(message + strlen(message), buf_size - strlen(message), 
-									//	"\n********************************************\n");
     log_result(log, message);
     free(message);
 }

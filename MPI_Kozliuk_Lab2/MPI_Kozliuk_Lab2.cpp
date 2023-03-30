@@ -470,7 +470,7 @@ int main(int argc, char* argv[])
 		gsl_vector_free(Y3_square_mul_y1);
 		gsl_matrix_free(A);
 		gsl_matrix_free(Y3_square);
-
+		destroy_logger(my_logger);
 	}
 	if(rank == 1)
 	{
@@ -486,6 +486,9 @@ int main(int argc, char* argv[])
 		MPI_Recv(b1->data, matrix_dimension, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &Status);
 		MPI_Recv(c1->data, matrix_dimension, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &Status);
 
+		//double start_time = MPI_Wtime();
+		timerify* timer = createTimer();
+		startTimer(timer);
 		gsl_vector* b12_min_c1 = calculate_12b1_minus_c1(b1, c1);
 		gsl_vector* y2 = mult_matrix_by_vector(A1, b12_min_c1);
 		gsl_vector* y1 = gsl_vector_alloc(matrix_dimension);
@@ -518,7 +521,13 @@ int main(int argc, char* argv[])
 		
 		//y2' + [(y1' * ([Y3^2 * y1] + y2) * Y3 + y1*y2') * y2]'
 		gsl_vector* final_result = add_vector_to_vector(y2, pre_final_res2);
-
+		stopTimer(timer);
+		
+		double end_time = MPI_Wtime();
+		//double elapsed_time = end_time - start_time;
+		char buf2[100];
+		sprintf_s(buf2, 100, "Elapsed time: %f seconds\n\n", getElapsedSeconds(timer));
+		log_result(my_logger, buf2);
 
 		/********************Logging and release memory**********************/
 
@@ -558,6 +567,7 @@ int main(int argc, char* argv[])
 		gsl_vector_free(pre_final_res2);
 		gsl_vector_free(final_result);
 		gsl_matrix_free(Y3);
+		destroy_logger(my_logger);
 	}
 	else if (rank == 2)
 	{
@@ -597,6 +607,7 @@ int main(int argc, char* argv[])
 		gsl_matrix_free(B2_min_C2);
 		gsl_matrix_free(Y3);
 		gsl_matrix_free(Y3_square);
+		destroy_logger(my_logger);
 	}
 
 

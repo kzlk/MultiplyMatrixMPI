@@ -123,7 +123,7 @@ void control_vector_input(gsl_vector* vector, const char choice)
 	switch (choice) {
 	case F_RANDOM:
 		generate_random_num_vector(vector);
-		output_vector(vector);
+		//output_vector(vector);
 		break;
 	case F_KEYBOARD:
 		input_vector(vector);
