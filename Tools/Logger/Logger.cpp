@@ -68,7 +68,7 @@ void log_matrix(logger* log, const gsl_matrix* matrix, const char* name)
 {
     if (log->func != NULL)
     {
-        const size_t buf_size = 100000;
+        const size_t buf_size = 1000000;
         char* message = (char*)malloc(buf_size);
         sprintf_s(message, buf_size, "\nMatrix %s:\n", name);
         log_result(log, message);
@@ -88,7 +88,7 @@ void log_matrix(logger* log, const gsl_matrix* matrix, const char* name)
 
 void log_vector(logger* log, const gsl_vector* vector, const char* name, const VECTOR_TYPE type)
 {
-    const size_t buf_size = 100000;
+    const size_t buf_size = 1000000;
     char* message = (char*)malloc(buf_size);
     sprintf_s(message, buf_size, "\nVector %s: \n[\n", name);
     for (size_t i = 0; i < vector->size; i++)

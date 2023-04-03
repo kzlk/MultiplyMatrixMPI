@@ -1,4 +1,7 @@
-﻿#include <stdio.h>
+﻿
+#include <windows.h>
+#include <chrono>
+#include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
@@ -6,9 +9,10 @@
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_vector.h>
 #include <cstring>
+#include <iostream>
+#include "..//Tools//Timer/Timer.h"
+#include "..//Tools//Logger//Logger.h"
 
-#include "../Tools/Timer/Timer.h"
-#include "../Tools/Logger/Logger.h"
 
 #define MAX_FILENAME_LENGTH 256
 #define DEFAULT_OUTPUT_FILENAME "output.txt"
@@ -66,18 +70,18 @@ FILLING input_validator(const char* message = NULL)
 	return choice;
 }
 
-void generate_random_num_vector(gsl_vector* vector) 
+void generate_random_num_vector(gsl_vector* vector)
 {
 	for (int i = 0; i < vector->size; i++) {
 		//gsl_vector_set(vector, i, rand() % 100 + 1);
-		gsl_vector_set(vector, i, i+1);
+		gsl_vector_set(vector, i, (i + 1) * 13 + i);
 	}
 }
 void generate_random_num_matrix(gsl_matrix* matrix) {
 	for (int i = 0; i < matrix->size1; i++) {
 		for (int j = 0; j < matrix->size1; j++) {
 			//gsl_matrix_set(matrix, i, j, rand() % 100 + 1);
-			gsl_matrix_set(matrix, i, j, i+1 * j+1 * j+1);
+			gsl_matrix_set(matrix, i, j, (i + 1 * j + 1 * j + 1) * 13 + i);
 		}
 	}
 }
@@ -301,6 +305,8 @@ char* get_input_file()
 
 gsl_vector* main_calculation(const gsl_vector* y1, const gsl_vector* y2 , const gsl_matrix* Y3, logger* my_logger = NULL)
 {
+	timerify* my_timer = createTimer();
+	startTimer(my_timer);
 	/********CALCULATE MAIN FORMULA STEP BY STEP*********/
 
 	//y1 * y2'
@@ -332,7 +338,7 @@ gsl_vector* main_calculation(const gsl_vector* y1, const gsl_vector* y2 , const 
 	gsl_vector* final_result = add_vector_to_vector(y2, pre_final_res2);
 
 
-	if (my_logger->func != NULL)
+	/*if (my_logger->func != NULL)
 	{
 		
 		log_vector(my_logger, y2, "y2'", V_ROW);
@@ -362,14 +368,15 @@ gsl_vector* main_calculation(const gsl_vector* y1, const gsl_vector* y2 , const 
 	gsl_vector_free(Y3_square_mul_y1_add_y2);
 	gsl_matrix_free(y1_trans_mul_Y3_square_mul_y1_add_y2_mul_Y3);
 	gsl_matrix_free(pre_final_res1);
-	gsl_vector_free(pre_final_res2);
-
+	gsl_vector_free(pre_final_res2);*/
+	stopTimer(my_timer);
+	//printf("\n Calculation time in func is %f s", getElapsedSeconds(my_timer));
 	return final_result;
 }
 
 int main()
 {
-	timerify* my_timer = createTimer();
+	
 	logger* my_logger = NULL;
 
 	int matrix_dimension = get_matrix_dimension();
@@ -418,14 +425,16 @@ int main()
 	if (my_logger->file != NULL)
 		input_log->file = my_logger->file;
 
-	log_matrix(input_log, A, "input A:");
+	/*log_matrix(input_log, A, "input A:");
 	log_matrix(input_log, A1, "input A1:");
 	log_vector(input_log, b1, "input b1:");
 	log_vector(input_log, c1, "input c1:");
 	log_matrix(input_log, A2, "input A2:");
-	log_matrix(input_log, B2, "input B2:");
-
+	log_matrix(input_log, B2, "input B2:");*/
+	timerify* my_timer = createTimer();
 	startTimer(my_timer);
+	//auto bb = GetTickCount64();
+	auto start = std::chrono::steady_clock::now();
 	/********CALCULATE VALUES FOR MAIN FORMULA*********/
 	gsl_vector* b = calculate_b(&matrix_dimension);
 	gsl_vector* y1 = mult_matrix_by_vector(A, b);
@@ -444,25 +453,35 @@ int main()
 	gsl_matrix* Y3 = mult_matrix_by_matrix(A2, B2_min_C2);
 	//gsl_matrix_mul_elements(Y3, A2); // Y3 = B2_min_C2 * B2
 
-	if(my_logger->func!= NULL && (print_intermediate_result != R_NONE))
-	{
-		log_vector(my_logger, b, "b: bi = i^2 / 12 for even and bi = i for odd\n b:");
-		log_vector(my_logger, y1, "y1 = A * b\n y1:");
-		log_vector(my_logger, b12_min_c1, "b12 minus c1 =:");
-		log_vector(my_logger, y2, "y2 = A1 * (12b1 - c1)\n y2=:");
-		log_matrix(my_logger, C2, "Cij = 1 / (i+j^2)\n C2=:");
-		log_matrix(my_logger, B2_min_C2, "B2 - C2 =:");
-		log_matrix(my_logger, Y3, "Y3 = A2 * (B2 - C2)\n Y3=:");
-	}
+	//if(my_logger->func!= NULL && (print_intermediate_result != R_NONE))
+	//{
+	//	log_vector(my_logger, b, "b: bi = i^2 / 12 for even and bi = i for odd\n b:");
+	//	log_vector(my_logger, y1, "y1 = A * b\n y1:");
+	//	log_vector(my_logger, b12_min_c1, "b12 minus c1 =:");
+	//	log_vector(my_logger, y2, "y2 = A1 * (12b1 - c1)\n y2=:");
+	//	log_matrix(my_logger, C2, "Cij = 1 / (i+j^2)\n C2=:");
+	//	log_matrix(my_logger, B2_min_C2, "B2 - C2 =:");
+	//	log_matrix(my_logger, Y3, "Y3 = A2 * (B2 - C2)\n Y3=:");
+	//}
 
 	//Main calculation
-
+	
 	gsl_vector* result = main_calculation(y1, y2, Y3, my_logger);
-	
 	stopTimer(my_timer);
-	printf("\n Calculation time is %lf s", getElapsedSeconds(my_timer));
+	printf("\n Calculation time MAIN is %f s\n", getElapsedSeconds(my_timer));
+
+	auto end = std::chrono::steady_clock::now();
+
+	std::cout << "\nElapsed time in milliseconds: "
+		<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+		<< "s";
+
+
+
+	//auto a = GetTickCount64();
+	//std::cout << '\n' << "Tick " << (a - bb)/CLOCKS_PER_SEC;
 	
-	log_vector(input_log, result, "result y2' + [(y1' * ([Y3^2 * y1] + y2) * Y3 + y1*y2') * y2]':", V_ROW);
+	//log_vector(input_log, result, "result y2' + [(y1' * ([Y3^2 * y1] + y2) * Y3 + y1*y2') * y2]':", V_ROW);
 
 	printf("\nresult y2' + [(y1' * ([Y3^2 * y1] + y2) * Y3 + y1*y2') * y2]': \n[\n");
 	output_vector(result, V_ROW);
@@ -487,6 +506,5 @@ int main()
 		destroy_logger(input_log);
 	destroyTimer(my_timer);
 	destroy_logger(my_logger);
-
 	return 0;
 }

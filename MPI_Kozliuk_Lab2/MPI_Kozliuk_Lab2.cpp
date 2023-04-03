@@ -74,14 +74,14 @@ void generate_random_num_vector(gsl_vector* vector)
 {
 	for (int i = 0; i < vector->size; i++) {
 		//gsl_vector_set(vector, i, rand() % 100 + 1);
-		gsl_vector_set(vector, i, i + 1);
+		gsl_vector_set(vector, i, (i + 1)* 13 + i);
 	}
 }
 void generate_random_num_matrix(gsl_matrix* matrix) {
 	for (int i = 0; i < matrix->size1; i++) {
 		for (int j = 0; j < matrix->size1; j++) {
 			//gsl_matrix_set(matrix, i, j, rand() % 100 + 1);
-			gsl_matrix_set(matrix, i, j, i + 1 * j + 1 * j + 1);
+			gsl_matrix_set(matrix, i, j, (i + 1 * j + 1 * j + 1)*13+i);
 		}
 	}
 }
@@ -117,7 +117,7 @@ void control_matrix_input(gsl_matrix* matrix, const char choice)
 	{
 	case F_RANDOM:
 		generate_random_num_matrix(matrix);
-		output_matrix(matrix);
+		//output_matrix(matrix);
 		break;
 	case F_KEYBOARD:
 		input_matrix(matrix);
@@ -132,10 +132,10 @@ void control_vector_input(gsl_vector* vector, const char choice)
 	switch (choice) {
 	case F_RANDOM:
 		generate_random_num_vector(vector);
-		output_vector(vector);
-		break;
+		//output_vector(vector);
+		break; 
 	case F_KEYBOARD:
-		input_vector(vector);
+		//input_vector(vector);
 		break;
 	case F_EXIT:
 		exit(1);
@@ -398,6 +398,7 @@ int main(int argc, char* argv[])
 	MPI_Bcast(&matrix_dimension, 1, MPI_INT, 0, MPI_COMM_WORLD);
 	MPI_Bcast(&print_intermediate_result, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
+
 	if (rank == 0)
 	{
 		if (print_intermediate_result == R_FILE || print_intermediate_result == R_BOTH)
@@ -419,57 +420,121 @@ int main(int argc, char* argv[])
 
 		control_matrix_input(A1, input_validator("\nEnter the values of the matrix A1:\n"));
 		printf("\n**********************************");
-		MPI_Send(A1->data, matrix_dimension * matrix_dimension, MPI_DOUBLE, 1, 0, MPI_COMM_WORLD);
-		gsl_matrix_free(A1);
+		//gsl_matrix_free(A1);
 
 		control_vector_input(b1, input_validator("\nEnter column-vector b1:\n"));
 		printf("\n**********************************");
-		MPI_Send(b1->data, matrix_dimension, MPI_DOUBLE, 1, 0, MPI_COMM_WORLD);
-		gsl_vector_free(b1);
+		//gsl_vector_free(b1);
 
 		control_vector_input(c1, input_validator("\nEnter column-vector c1:\n"));
 		printf("\n**********************************");
-		MPI_Send(c1->data, matrix_dimension, MPI_DOUBLE, 1, 0, MPI_COMM_WORLD);
-		gsl_vector_free(c1);
+		//gsl_vector_free(c1);
 
 		control_matrix_input(A2, input_validator("\nEnter the values of the matrix A2:\n"));
 		printf("\n**********************************");
-		MPI_Send(A2->data, matrix_dimension * matrix_dimension, MPI_DOUBLE, 2, 0, MPI_COMM_WORLD);
-		gsl_matrix_free(A2);
+		MPI_Send(A2->data, matrix_dimension * matrix_dimension, MPI_DOUBLE, 1, 0, MPI_COMM_WORLD);
+		//gsl_matrix_free(A2);
 
 		control_matrix_input(B2, input_validator("\nEnter the values of the matrix B2:\n"));
 		printf("\n**********************************");
 		fflush(stdout);
-		MPI_Send(B2->data, matrix_dimension * matrix_dimension, MPI_DOUBLE, 2, 0, MPI_COMM_WORLD);
-		gsl_matrix_free(B2);
+		MPI_Send(B2->data, matrix_dimension * matrix_dimension, MPI_DOUBLE, 1, 0, MPI_COMM_WORLD);
+		//gsl_matrix_free(B2);
 		/*******************************************************************************************/
-
+		gsl_vector* Y3_square_mul_y1 = gsl_vector_alloc(matrix_dimension);
+		gsl_matrix* Y3 = gsl_matrix_alloc(matrix_dimension, matrix_dimension);
 		/*calculation in first process*/
-		gsl_vector* b = calculate_b(&matrix_dimension);
-		gsl_vector* y1 = mult_matrix_by_vector(A, b);
 
+		timerify* timer = createTimer();
+		startTimer(timer);
+
+		gsl_vector* b = calculate_b(&matrix_dimension);//1
+		gsl_vector* y1 = mult_matrix_by_vector(A, b);//2
 		//send y1 to 1 proc
 		MPI_Send(y1->data, matrix_dimension, MPI_DOUBLE, 1, 0, MPI_COMM_WORLD);
+		gsl_vector* b12_min_c1 = calculate_12b1_minus_c1(b1, c1);//3
+		gsl_vector* y2 = mult_matrix_by_vector(A1, b12_min_c1);//4
+		//y1 * y2'
+		gsl_matrix* y1_mul_y2_trans = mult_row_by_col_vector(y2, y1);//5
 
-		gsl_matrix* Y3_square = gsl_matrix_alloc(matrix_dimension, matrix_dimension);
-		MPI_Recv(Y3_square->data, matrix_dimension * matrix_dimension, MPI_DOUBLE, 2, 0, MPI_COMM_WORLD, &Status);
+		MPI_Recv(Y3_square_mul_y1->data, matrix_dimension, MPI_DOUBLE, 1, 0, MPI_COMM_WORLD, &Status);
+
+		//
+			//[Y3^2 * y1] + y2
+		gsl_vector* Y3_square_mul_y1_add_y2 = add_vector_to_vector(Y3_square_mul_y1, y2);
+
+		//y1' * ([Y3^2 * y1] + y2)
+		double y1_trans_mul_Y3_square_mul_y1_add_y2 = NULL;
+		gsl_blas_ddot(y1, Y3_square_mul_y1_add_y2, &y1_trans_mul_Y3_square_mul_y1_add_y2);
+
+		MPI_Recv(Y3->data, matrix_dimension * matrix_dimension, MPI_DOUBLE, 1, 0, MPI_COMM_WORLD, &Status);
+
+		//y1' * ([Y3^2 * y1] + y2) * Y3
+		gsl_matrix* y1_trans_mul_Y3_square_mul_y1_add_y2_mul_Y3 = mult_scalar_by_matrix(y1_trans_mul_Y3_square_mul_y1_add_y2, Y3);
+
+		//(y1' * ([Y3^2 * y1] + y2) * Y3 + y1*y2')
+		gsl_matrix* pre_final_res1 = add_matrix_to_matrix(y1_trans_mul_Y3_square_mul_y1_add_y2_mul_Y3, y1_mul_y2_trans);
+
+		//(y1' * ([Y3^2 * y1] + y2) * Y3 + y1*y2') * y2
+		gsl_vector* pre_final_res2 = mult_matrix_by_vector(pre_final_res1, y2);
+
+		//y2' + [(y1' * ([Y3^2 * y1] + y2) * Y3 + y1*y2') * y2]'
+		gsl_vector* final_result = add_vector_to_vector(y2, pre_final_res2);
+
+		stopTimer(timer);
+
+		char buf2[100];
+		sprintf_s(buf2, 100, "Elapsed time: %f seconds\n\n", getElapsedSeconds(timer));
 		
-		//Y3^2 * y1
-		gsl_vector* Y3_square_mul_y1 = mult_matrix_by_vector(Y3_square, y1);
-		MPI_Send(Y3_square_mul_y1->data, matrix_dimension, MPI_DOUBLE, 1, 0, MPI_COMM_WORLD);
+		if (my_logger->func != NULL) log_result(my_logger, buf2);
+		printf("%s", buf2);
 
 		/********************Logging and release memory**********************/
-		log_matrix(my_logger, A, "input A:");
-		log_vector(my_logger, b, "b: bi = i^2 / 12 for even and bi = i for odd\n b:");
-		log_vector(my_logger, y1, "y1 = A * b\n y1:");
-		log_matrix(my_logger, Y3_square, "Y3^2");
-		log_vector(my_logger, Y3_square_mul_y1, "Y3^2 * y1");
+		if (my_logger->func != NULL)
+		{
+			log_matrix(my_logger, A, "input A:");
+			log_vector(my_logger, b1, "input b1:");
+			log_matrix(my_logger, A1, "input A1:");
+			log_vector(my_logger, c1, "input c1:");
+			//log_matrix(my_logger, A2, "input A2:");
+			//log_matrix(my_logger, B2, "input B2:");
+			log_vector(my_logger, b, "b: bi = i^2 / 12 for even and bi = i for odd\n b:");
+			log_vector(my_logger, y1, "y1 = A * b\n y1:");
+			log_vector(my_logger, b12_min_c1, "b12 minus c1 =:");
+			log_vector(my_logger, y2, "y2 = A1 * (12b1 - c1)\n y2=:");
+			log_vector(my_logger, y2, "y2'", V_ROW);
+			log_matrix(my_logger, y1_mul_y2_trans, "y1 * y2'");
+			log_vector(my_logger, Y3_square_mul_y1_add_y2, "[Y3^2 * y1] + y2");
 
-		gsl_vector_free(b);
+			char buf[100];
+			sprintf_s(buf, 100, "\nNumber y1' * ([Y3^2 * y1] + y2): %lf \n", y1_trans_mul_Y3_square_mul_y1_add_y2);
+			log_result(my_logger, buf);
+
+			log_matrix(my_logger, y1_trans_mul_Y3_square_mul_y1_add_y2_mul_Y3, "y1' * ([Y3^2 * y1] + y2) * Y3");
+			log_matrix(my_logger, pre_final_res1, "(y1' * ([Y3^2 * y1] + y2) * Y3 + y1*y2')");
+
+			log_vector(my_logger, pre_final_res2, "(y1' * ([Y3^2 * y1] + y2) * Y3 + y1*y2') * y2");
+
+			log_vector(my_logger, pre_final_res2, "((y1' * ([Y3^2 * y1] + y2) * Y3 + y1*y2') * y2)'", V_ROW);
+
+			log_vector(my_logger, final_result, "result y2' + [(y1' * ([Y3^2 * y1] + y2) * Y3 + y1*y2') * y2]':", V_ROW);
+		}
+		gsl_vector_free(b1);
+		gsl_vector_free(c1);
+		gsl_matrix_free(A1);
+		gsl_vector_free(b12_min_c1);
+		gsl_vector_free(y2);
 		gsl_vector_free(y1);
+		gsl_matrix_free(y1_mul_y2_trans);
 		gsl_vector_free(Y3_square_mul_y1);
+		gsl_vector_free(Y3_square_mul_y1_add_y2);
+		gsl_matrix_free(y1_trans_mul_Y3_square_mul_y1_add_y2_mul_Y3);
+		gsl_matrix_free(pre_final_res1);
+		gsl_vector_free(pre_final_res2);
+		gsl_vector_free(final_result);
+		gsl_matrix_free(Y3);
+		gsl_vector_free(b);
 		gsl_matrix_free(A);
-		gsl_matrix_free(Y3_square);
 		destroy_logger(my_logger);
 	}
 	if(rank == 1)
@@ -477,60 +542,50 @@ int main(int argc, char* argv[])
 		if (print_intermediate_result == R_FILE || print_intermediate_result == R_BOTH)
 			my_logger = create_logger(print_intermediate_result, DEFAULT_OUTPUT_FILENAME_PROC2);
 		else my_logger = create_logger(print_intermediate_result);
-		
-		gsl_vector* b1 = gsl_vector_alloc(matrix_dimension);
-		gsl_vector* c1 = gsl_vector_alloc(matrix_dimension);
-		gsl_matrix* A1 = gsl_matrix_alloc(matrix_dimension, matrix_dimension);
 
-		MPI_Recv(A1->data, matrix_dimension * matrix_dimension, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &Status);
-		MPI_Recv(b1->data, matrix_dimension, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &Status);
-		MPI_Recv(c1->data, matrix_dimension, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &Status);
-
-		//double start_time = MPI_Wtime();
-		timerify* timer = createTimer();
-		startTimer(timer);
-		gsl_vector* b12_min_c1 = calculate_12b1_minus_c1(b1, c1);
-		gsl_vector* y2 = mult_matrix_by_vector(A1, b12_min_c1);
 		gsl_vector* y1 = gsl_vector_alloc(matrix_dimension);
+		gsl_matrix* A2 = gsl_matrix_alloc(matrix_dimension, matrix_dimension);
+		gsl_matrix* B2 = gsl_matrix_alloc(matrix_dimension, matrix_dimension);
+		MPI_Recv(A2->data, matrix_dimension * matrix_dimension, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &Status);
+		MPI_Recv(B2->data, matrix_dimension * matrix_dimension, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &Status);
+
+		gsl_matrix* C2 = calculate_C2(&matrix_dimension);//1
+		gsl_matrix* B2_min_C2 = gsl_matrix_alloc(A2->size1, A2->size1);//2
 		MPI_Recv(y1->data, matrix_dimension, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &Status);
+		gsl_matrix_memcpy(B2_min_C2, B2); // B2_min_C2 <- B2
+		gsl_matrix_sub(B2_min_C2, C2); // B2_min_C2 = B2_min_C2 - C2 
+		gsl_matrix* Y3 = mult_matrix_by_matrix(A2, B2_min_C2);//3
 
-		//y1 * y2'
-		gsl_matrix* y1_mul_y2_trans = mult_row_by_col_vector(y2, y1);
+		//Y3^2 -> Y3 * Y3
+		gsl_matrix* Y3_square = mult_matrix_by_matrix(Y3, Y3);//4
 
-		gsl_vector* Y3_square_mul_y1 = gsl_vector_alloc(matrix_dimension);
-		MPI_Recv(Y3_square_mul_y1->data, matrix_dimension, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &Status);
-		
-		//[Y3^2 * y1] + y2
-		gsl_vector* Y3_square_mul_y1_add_y2 = add_vector_to_vector(Y3_square_mul_y1, y2);
-
-		//y1' * ([Y3^2 * y1] + y2)
-		double y1_trans_mul_Y3_square_mul_y1_add_y2 = NULL;
-		gsl_blas_ddot(y1, Y3_square_mul_y1_add_y2, &y1_trans_mul_Y3_square_mul_y1_add_y2);
-
-		gsl_matrix* Y3 = gsl_matrix_alloc(matrix_dimension, matrix_dimension);
-		MPI_Recv(Y3->data, matrix_dimension * matrix_dimension, MPI_DOUBLE, 2, 0, MPI_COMM_WORLD, &Status);
-
-		//y1' * ([Y3^2 * y1] + y2) * Y3
-		gsl_matrix* y1_trans_mul_Y3_square_mul_y1_add_y2_mul_Y3 = mult_scalar_by_matrix(y1_trans_mul_Y3_square_mul_y1_add_y2, Y3);
-	
-		//(y1' * ([Y3^2 * y1] + y2) * Y3 + y1*y2')
-		gsl_matrix* pre_final_res1 = add_matrix_to_matrix(y1_trans_mul_Y3_square_mul_y1_add_y2_mul_Y3, y1_mul_y2_trans);
-		
-		//(y1' * ([Y3^2 * y1] + y2) * Y3 + y1*y2') * y2
-		gsl_vector* pre_final_res2 = mult_matrix_by_vector(pre_final_res1, y2);
-		
-		//y2' + [(y1' * ([Y3^2 * y1] + y2) * Y3 + y1*y2') * y2]'
-		gsl_vector* final_result = add_vector_to_vector(y2, pre_final_res2);
-		stopTimer(timer);
-		
-		double end_time = MPI_Wtime();
-		//double elapsed_time = end_time - start_time;
-		char buf2[100];
-		sprintf_s(buf2, 100, "Elapsed time: %f seconds\n\n", getElapsedSeconds(timer));
-		log_result(my_logger, buf2);
+		//Y3^2 * y1
+		gsl_vector* Y3_square_mul_y1 = mult_matrix_by_vector(Y3_square, y1);//5
+		MPI_Send(Y3_square_mul_y1->data, matrix_dimension, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+		MPI_Send(Y3->data, matrix_dimension * matrix_dimension, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
 
 		/********************Logging and release memory**********************/
+	if (my_logger->func != NULL)
+		{
+			log_matrix(my_logger, A2, "input A2:");
+			log_matrix(my_logger, B2, "input B2:");
+			log_matrix(my_logger, C2, "Cij = 1 / (i+j^2)\n C2=:");
+			log_matrix(my_logger, B2_min_C2, "B2 - C2 =:");
+			log_matrix(my_logger, Y3, "Y3 = A2 * (B2 - C2)\n Y3=:");
+			log_matrix(my_logger, Y3_square, "Y3^2");
+			log_vector(my_logger, Y3_square_mul_y1, "Y3^2 * y1");
+		}
+		gsl_matrix_free(A2);
+		gsl_matrix_free(B2);
+		gsl_matrix_free(C2);
+		gsl_matrix_free(B2_min_C2);
+		gsl_matrix_free(Y3);
+		gsl_matrix_free(Y3_square);
+		gsl_vector_free(Y3_square_mul_y1);
+		destroy_logger(my_logger);
 
+
+		/*
 		log_matrix(my_logger, A1, "input A1:");
 		log_vector(my_logger, b1, "input b1:");
 		log_vector(my_logger, c1, "input c1:");
@@ -568,48 +623,8 @@ int main(int argc, char* argv[])
 		gsl_vector_free(final_result);
 		gsl_matrix_free(Y3);
 		destroy_logger(my_logger);
+		*/
 	}
-	else if (rank == 2)
-	{
-		if (print_intermediate_result == R_FILE || print_intermediate_result == R_BOTH)
-			my_logger = create_logger(print_intermediate_result, DEFAULT_OUTPUT_FILENAME_PROC3);
-		else my_logger = create_logger(print_intermediate_result);
-
-		gsl_matrix* A2 = gsl_matrix_alloc(matrix_dimension, matrix_dimension);
-		
-		gsl_matrix* B2 = gsl_matrix_alloc(matrix_dimension, matrix_dimension);
-	
-		MPI_Recv(A2->data, matrix_dimension * matrix_dimension, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &Status);
-		MPI_Recv(B2->data, matrix_dimension * matrix_dimension, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &Status);
-
-		gsl_matrix* C2 = calculate_C2(&matrix_dimension);
-		gsl_matrix* B2_min_C2 = gsl_matrix_alloc(A2->size1, A2->size1);
-		gsl_matrix_memcpy(B2_min_C2, B2); // B2_min_C2 <- B2
-		gsl_matrix_sub(B2_min_C2, C2); // B2_min_C2 = B2_min_C2 - C2 
-		gsl_matrix* Y3 = mult_matrix_by_matrix(A2, B2_min_C2);
-		//Y3^2 -> Y3 * Y3
-		gsl_matrix* Y3_square = mult_matrix_by_matrix(Y3, Y3);
-		MPI_Send(Y3_square->data, matrix_dimension* matrix_dimension, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
-		MPI_Send(Y3->data, matrix_dimension* matrix_dimension, MPI_DOUBLE, 1, 0, MPI_COMM_WORLD);
-
-		/********************Logging and release memory**********************/
-
-		log_matrix(my_logger, A2, "input A2:");
-		log_matrix(my_logger, B2, "input B2:");
-		log_matrix(my_logger, C2, "Cij = 1 / (i+j^2)\n C2=:");
-		log_matrix(my_logger, B2_min_C2, "B2 - C2 =:");
-		log_matrix(my_logger, Y3, "Y3 = A2 * (B2 - C2)\n Y3=:");
-		log_matrix(my_logger, Y3_square, "Y3^2");
-
-		gsl_matrix_free(A2);
-		gsl_matrix_free(B2);
-		gsl_matrix_free(C2);
-		gsl_matrix_free(B2_min_C2);
-		gsl_matrix_free(Y3);
-		gsl_matrix_free(Y3_square);
-		destroy_logger(my_logger);
-	}
-
 
 	MPI_Finalize();
 	return 0;
